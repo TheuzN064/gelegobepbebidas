@@ -231,7 +231,7 @@ body.dark .price-now{color:var(--amber);}
 .btn-dark{background:var(--navy); color:#fff;}
 .btn-outline{background:transparent; border:1px solid var(--line); color:var(--ink);}
 .btn-danger{background:var(--cherry); color:#fff;}
-.btn-sm{width:auto; padding:8px 14px; font-size:12px; border-radius:9px;}
+.btn-sm{width:auto; padding:8px 14px; font-size:12px; border-radius:99px;}
 
 /* forms */
 .field{margin-bottom:12px;}
@@ -365,7 +365,7 @@ body.dark .price-now{color:var(--amber);}
     <div class="err-msg hidden" id="adminLoginErr">Senha incorreta.</div>
     <button class="btn btn-dark" style="margin-top:8px" id="adminLoginBtn">Entrar</button>
     <button class="btn btn-outline" style="margin-top:8px" id="backToCatalogBtn">← Voltar ao catálogo</button>
-    <p class="hint">Senha padrão inicial: <b class="mono">admin123</b>. Altere em Configurações após entrar. Este é um painel de demonstração front-end: a senha fica salva no armazenamento do catálogo, não em um servidor seguro — para uso real, ligue isso a uma autenticação de verdade.</p>
+    <p class="hint">Senha padrão inicial: <b class="mono">admin123</b>. Altere em Configurações após entrar. Este é um painel de demonstração front-end: a senha fica salva no armazenamento local do catálogo.</p>
   </div>
 </div>
 
@@ -411,7 +411,7 @@ body.dark .price-now{color:var(--amber);}
 <script>
 /* =========================================================================
    CAIXA FRIA — catálogo de bebidas com pedido via WhatsApp + painel admin
-   Dados persistidos via window.storage (compartilhados entre visitantes).
+   Dados persistidos via localStorage.
    ========================================================================= */
 
 const KEYS = {
@@ -489,33 +489,34 @@ function seedConfig(){
 }
 
 /* ---------------- STORAGE HELPERS ---------------- */
-async function loadAll(){
+function loadAll(){
   try{
-    const [p,c,co,cf] = await Promise.all([
-      safeGet(KEYS.products), safeGet(KEYS.categories), safeGet(KEYS.coupons), safeGet(KEYS.config)
-    ]);
+    const p = safeGet(KEYS.products);
+    const c = safeGet(KEYS.categories);
+    const co = safeGet(KEYS.coupons);
+    const cf = safeGet(KEYS.config);
     state.products = p ?? seedProducts();
     state.categories = c ?? seedCategories();
     state.coupons = co ?? seedCoupons();
     state.config = cf ?? seedConfig();
-    if(!p) await window.storage.set(KEYS.products, state.products, true);
-    if(!c) await window.storage.set(KEYS.categories, state.categories, true);
-    if(!co) await window.storage.set(KEYS.coupons, state.coupons, true);
-    if(!cf) await window.storage.set(KEYS.config, state.config, true);
+    if(!p) persist(KEYS.products, state.products);
+    if(!c) persist(KEYS.categories, state.categories);
+    if(!co) persist(KEYS.coupons, state.coupons);
+    if(!cf) persist(KEYS.config, state.config);
   }catch(e){
     console.error('Erro ao carregar dados, usando padrão em memória.', e);
     state.products = seedProducts(); state.categories = seedCategories();
     state.coupons = seedCoupons(); state.config = seedConfig();
   }
 }
-async function safeGet(key){
+function safeGet(key){
   try{
-    const r = await window.storage.get(key, true);
-    return r ? r.value : null;
+    const r = localStorage.getItem(key);
+    return r ? JSON.parse(r) : null;
   }catch(e){ return null; }
 }
-async function persist(key, value){
-  try{ await window.storage.set(key, value, true); }
+function persist(key, value){
+  try{ localStorage.setItem(key, JSON.stringify(value)); }
   catch(e){ console.error('Falha ao salvar', key, e); }
 }
 const saveProducts = ()=>persist(KEYS.products, state.products);
@@ -870,11 +871,11 @@ document.getElementById('fabCart').onclick = ()=>{ renderCartDrawer(); document.
 document.getElementById('searchInput').addEventListener('input', e=>{
   state.search = e.target.value; state.currentCategory='all'; renderCatNav(); renderProductGrid();
 });
-document.getElementById('darkToggle').onclick = async ()=>{
+document.getElementById('darkToggle').onclick = ()=>{
   state.darkMode = !state.darkMode;
   document.body.classList.toggle('dark', state.darkMode);
   document.getElementById('darkToggle').textContent = state.darkMode ? '☀️' : '🌙';
-  try{ await window.storage.set('prefs:darkmode', state.darkMode?'1':'0', false); }catch(e){}
+  try{ localStorage.setItem('prefs:darkmode', state.darkMode ? '1' : '0'); }catch(e){}
 };
 document.getElementById('shareBtn').onclick = async ()=>{
   try{ await navigator.clipboard.writeText(location.href); }catch(e){}
@@ -1070,7 +1071,7 @@ function openCategoryModal(id){
   document.getElementById('categoryModalOverlay').classList.add('show');
 }
 
-/* ---- Promoções (view focada em produtos com preço promocional) ---- */
+/* ---- Promoções ---- */
 function renderAdminPromotions(main){
   main.innerHTML = `<div class="admin-topline"><h3 style="margin:0">Promoções</h3></div>
   <p class="hint" style="margin-bottom:14px">Promoções são definidas no cadastro de cada produto (preço promocional + período). Veja abaixo as promoções ativas e programadas. Use "+ Nova promoção" para escolher rapidamente um produto.</p>
@@ -1194,11 +1195,11 @@ function renderAll(){
 }
 
 /* ---------------- INIT ---------------- */
-(async function init(){
-  await loadAll();
+(function init(){
+  loadAll();
   try{
-    const dm = await window.storage.get('prefs:darkmode', false);
-    if(dm && dm.value==='1'){ state.darkMode=true; document.body.classList.add('dark'); document.getElementById('darkToggle').textContent='☀️'; }
+    const dm = localStorage.getItem('prefs:darkmode');
+    if(dm === '1'){ state.darkMode=true; document.body.classList.add('dark'); document.getElementById('darkToggle').textContent='☀️'; }
   }catch(e){}
   renderAll();
 })();
